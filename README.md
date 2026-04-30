@@ -31,27 +31,9 @@ npm run dev
 
 Código en GitHub: **https://github.com/saturnovill/ragdemo**
 
-### Opción A — Integración nativa Vercel ↔ GitHub (recomendada)
+El proyecto está enlazado con **Vercel ↔ GitHub**: cada `git push` a **`main`** dispara un deploy de producción; los **pull requests** pueden generar **preview deployments** según la configuración del proyecto en Vercel.
 
-1. En [Vercel](https://vercel.com) abre el proyecto **ragdemo** (el que ya enlazaste con `vercel link`).
-2. **Settings → Git** → **Connect Git Repository** → elige `saturnovill/ragdemo` y la rama **main**.
-3. Si falla la conexión, en GitHub ve a **Settings → Applications → Vercel** y concede acceso al repositorio `ragdemo`.
-
-Con eso, cada `git push` a `main` dispara un deploy de producción (y los PRs pueden tener previews si lo activas en el proyecto).
-
-### Opción B — GitHub Actions
-
-Si prefieres no conectar el repo en el dashboard, el workflow [`.github/workflows/deploy-vercel.yml`](.github/workflows/deploy-vercel.yml) despliega con `vercel build` + `vercel deploy --prebuilt` en cada push a `main`.
-
-Crea en el repo de GitHub **Settings → Secrets and variables → Actions** estos secretos:
-
-| Secreto | Dónde obtenerlo |
-|---------|------------------|
-| `VERCEL_TOKEN` | [Vercel → Account → Tokens](https://vercel.com/account/tokens) → Create |
-| `VERCEL_ORG_ID` | En la carpeta local `.vercel/project.json` → campo `orgId` (o `vercel whoami` / team en el dashboard) |
-| `VERCEL_PROJECT_ID` | En `.vercel/project.json` → campo `projectId` |
-
-Tras guardar los secretos, un push a `main` ejecutará el workflow.
+Si enlazas otro clon desde cero: en [Vercel](https://vercel.com) → proyecto **ragdemo** → **Settings → Git** → conecta `saturnovill/ragdemo`. Si GitHub no muestra el repo, revisa **Settings → Applications → Vercel** y el acceso al repositorio.
 
 ### Despliegue manual (CLI)
 
