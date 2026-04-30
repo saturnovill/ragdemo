@@ -8,8 +8,15 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { DocumentManifest } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
-export function DocumentList({ refreshKey }: { refreshKey: number }) {
+export function DocumentList({
+  refreshKey,
+  embedded = false,
+}: {
+  refreshKey: number;
+  embedded?: boolean;
+}) {
   const [docs, setDocs] = useState<DocumentManifest[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -47,74 +54,101 @@ export function DocumentList({ refreshKey }: { refreshKey: number }) {
     }
   }
 
+  const listBody = (
+    <>
+      {loading ? (
+        <div className="flex flex-1 items-center justify-center py-10 text-muted-foreground">
+          <Loader2 className="size-5 animate-spin" />
+        </div>
+      ) : docs.length === 0 ? (
+        <p
+          className={cn(
+            "px-1 text-muted-foreground",
+            embedded ? "py-3 text-[11px] leading-snug" : "px-4 pb-4 text-sm"
+          )}
+        >
+          Sin archivos. Usa el área de arriba para indexar documentos.
+        </p>
+      ) : (
+        <ScrollArea
+          className={cn(
+            embedded ? "min-h-0 flex-1" : "h-[320px] px-4 pb-4"
+          )}
+        >
+          <ul className={cn("space-y-0.5 pr-2", embedded && "py-0.5")}>
+            {docs.map((d) => (
+              <li
+                key={d.documentId}
+                className={cn(
+                  "group flex items-start gap-1 rounded-sm px-1.5 py-1.5 text-left transition-colors hover:bg-sidebar-accent/80",
+                  embedded && "border border-transparent hover:border-sidebar-border"
+                )}
+              >
+                <FileText className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                  <div
+                    className="truncate font-mono text-[11px] font-medium leading-tight text-foreground"
+                    title={d.fileName}
+                  >
+                    {d.fileName}
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-0.5">
+                    <Badge
+                      variant={
+                        d.status === "ready"
+                          ? "default"
+                          : d.status === "error"
+                            ? "destructive"
+                            : "secondary"
+                      }
+                      className="h-4 px-1 text-[9px] leading-none"
+                    >
+                      {d.status}
+                    </Badge>
+                    {d.pageCount != null && (
+                      <Badge variant="outline" className="h-4 px-1 text-[9px] leading-none">
+                        {d.pageCount} pág.
+                      </Badge>
+                    )}
+                  </div>
+                  {d.error && (
+                    <p className="mt-0.5 text-[10px] leading-tight text-destructive">
+                      {d.error}
+                    </p>
+                  )}
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                  onClick={() => remove(d.documentId)}
+                  aria-label="Eliminar documento"
+                >
+                  <Trash2 className="size-3.5" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </ScrollArea>
+      )}
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-sidebar-border bg-sidebar-accent/20">
+        {listBody}
+      </div>
+    );
+  }
+
   return (
     <Card className="flex max-h-[420px] flex-col">
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Biblioteca</CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 p-0">
-        {loading ? (
-          <div className="flex items-center justify-center py-12 text-muted-foreground">
-            <Loader2 className="size-6 animate-spin" />
-          </div>
-        ) : docs.length === 0 ? (
-          <p className="px-4 pb-4 text-sm text-muted-foreground">
-            Aún no hay documentos. Sube un PDF o una imagen para empezar.
-          </p>
-        ) : (
-          <ScrollArea className="h-[320px] px-4 pb-4">
-            <ul className="space-y-2">
-              {docs.map((d) => (
-                <li
-                  key={d.documentId}
-                  className="flex items-start justify-between gap-2 rounded-md border border-border/60 bg-muted/20 p-2"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <FileText className="size-4 shrink-0 text-muted-foreground" />
-                      <span className="truncate text-sm font-medium">
-                        {d.fileName}
-                      </span>
-                    </div>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      <Badge
-                        variant={
-                          d.status === "ready"
-                            ? "default"
-                            : d.status === "error"
-                              ? "destructive"
-                              : "secondary"
-                        }
-                        className="text-[10px]"
-                      >
-                        {d.status}
-                      </Badge>
-                      {d.pageCount != null && (
-                        <Badge variant="outline" className="text-[10px]">
-                          {d.pageCount} pág.
-                        </Badge>
-                      )}
-                    </div>
-                    {d.error && (
-                      <p className="mt-1 text-xs text-destructive">{d.error}</p>
-                    )}
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="shrink-0"
-                    onClick={() => remove(d.documentId)}
-                    aria-label="Eliminar documento"
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          </ScrollArea>
-        )}
-      </CardContent>
+      <CardContent className="flex-1 p-0">{listBody}</CardContent>
     </Card>
   );
 }

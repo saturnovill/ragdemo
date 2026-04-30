@@ -31,7 +31,7 @@ export default function RootLayout({
       className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-background">
+      <body className="flex h-dvh flex-col overflow-hidden bg-background">
         <Providers>
           {children}
           <Toaster richColors position="top-center" />

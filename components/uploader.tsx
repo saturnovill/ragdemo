@@ -6,8 +6,15 @@ import { toast } from "sonner";
 import { Upload, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
-export function Uploader({ onUploaded }: { onUploaded: () => void }) {
+export function Uploader({
+  onUploaded,
+  embedded = false,
+}: {
+  onUploaded: () => void;
+  embedded?: boolean;
+}) {
   const [busy, setBusy] = useState(false);
 
   const onDrop = useCallback(
@@ -53,6 +60,59 @@ export function Uploader({ onUploaded }: { onUploaded: () => void }) {
     },
   });
 
+  const zone = (
+    <div
+      {...getRootProps()}
+      className={cn(
+        "flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border/90 bg-muted/25 text-center transition-colors hover:bg-muted/45",
+        embedded ? "mt-2 px-2 py-5" : "min-h-[120px] px-4 py-8",
+        isDragActive && "border-primary bg-muted/55"
+      )}
+    >
+      <input {...getInputProps()} />
+      {busy ? (
+        <Loader2
+          className={cn(
+            "animate-spin text-muted-foreground",
+            embedded ? "size-6" : "mb-2 size-8"
+          )}
+        />
+      ) : (
+        <Upload
+          className={cn(
+            "text-muted-foreground",
+            embedded ? "mb-1 size-5" : "mb-2 size-8"
+          )}
+        />
+      )}
+      <p
+        className={cn(
+          "font-medium text-foreground",
+          embedded ? "text-[11px] leading-tight" : "text-sm"
+        )}
+      >
+        {embedded ? "Soltar o elegir archivo" : "Arrastra PDF, imagen, TXT o MD"}
+      </p>
+      {!embedded && (
+        <p className="mt-1 text-xs text-muted-foreground">
+          Indexación Pinecone + captura de página
+        </p>
+      )}
+      <Button
+        type="button"
+        variant="secondary"
+        className={cn("mt-3", embedded && "h-7 text-[11px]")}
+        size={embedded ? "sm" : "default"}
+      >
+        Explorar…
+      </Button>
+    </div>
+  );
+
+  if (embedded) {
+    return zone;
+  }
+
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -61,30 +121,7 @@ export function Uploader({ onUploaded }: { onUploaded: () => void }) {
           Subir conocimiento
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div
-          {...getRootProps()}
-          className={`flex min-h-[120px] cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border/80 bg-muted/30 px-4 py-8 text-center text-sm transition-colors hover:bg-muted/50 ${
-            isDragActive ? "border-primary bg-muted/60" : ""
-          }`}
-        >
-          <input {...getInputProps()} />
-          {busy ? (
-            <Loader2 className="mb-2 size-8 animate-spin text-muted-foreground" />
-          ) : (
-            <Upload className="mb-2 size-8 text-muted-foreground" />
-          )}
-          <p className="font-medium text-foreground">
-            Arrastra PDF, imagen, TXT o MD
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Se indexa en Pinecone con Gemini Embedding 2 y captura de página
-          </p>
-          <Button type="button" variant="secondary" className="mt-4" size="sm">
-            Elegir archivo
-          </Button>
-        </div>
-      </CardContent>
+      <CardContent>{zone}</CardContent>
     </Card>
   );
 }
