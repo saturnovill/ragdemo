@@ -7,6 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { DocumentManifest } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -19,18 +29,19 @@ export function DocumentList({
 }) {
   const [docs, setDocs] = useState<DocumentManifest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [docToDelete, setDocToDelete] = useState<DocumentManifest | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { quiet?: boolean }) => {
+    if (!opts?.quiet) setLoading(true);
     try {
-      const res = await fetch("/api/documents");
+      const res = await fetch("/api/documents", { cache: "no-store" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Error");
       setDocs(data.documents ?? []);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al listar");
     } finally {
-      setLoading(false);
+      if (!opts?.quiet) setLoading(false);
     }
   }, []);
 
@@ -38,18 +49,23 @@ export function DocumentList({
     void load();
   }, [load, refreshKey]);
 
-  async function remove(id: string) {
+  async function deleteDoc(doc: DocumentManifest) {
+    const id = doc.documentId;
+    const prev = docs;
+    setDocs((d) => d.filter((x) => x.documentId !== id));
     try {
       const res = await fetch(`/api/documents?id=${encodeURIComponent(id)}`, {
         method: "DELETE",
+        cache: "no-store",
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? "Error al borrar");
       }
       toast.success("Documento eliminado");
-      void load();
+      await load({ quiet: true });
     } catch (e) {
+      setDocs(prev);
       toast.error(e instanceof Error ? e.message : "Error al borrar");
     }
   }
@@ -81,7 +97,8 @@ export function DocumentList({
                 key={d.documentId}
                 className={cn(
                   "group flex items-start gap-1 rounded-sm px-1.5 py-1.5 text-left transition-colors hover:bg-sidebar-accent/80",
-                  embedded && "border border-transparent hover:border-sidebar-border"
+                  embedded &&
+                    "border border-transparent hover:border-sidebar-border"
                 )}
               >
                 <FileText className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
@@ -106,7 +123,10 @@ export function DocumentList({
                       {d.status}
                     </Badge>
                     {d.pageCount != null && (
-                      <Badge variant="outline" className="h-4 px-1 text-[9px] leading-none">
+                      <Badge
+                        variant="outline"
+                        className="h-4 px-1 text-[9px] leading-none"
+                      >
                         {d.pageCount} pág.
                       </Badge>
                     )}
@@ -122,7 +142,7 @@ export function DocumentList({
                   variant="ghost"
                   size="icon"
                   className="size-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
-                  onClick={() => remove(d.documentId)}
+                  onClick={() => setDocToDelete(d)}
                   aria-label="Eliminar documento"
                 >
                   <Trash2 className="size-3.5" />
@@ -135,20 +155,55 @@ export function DocumentList({
     </>
   );
 
-  if (embedded) {
-    return (
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-sidebar-border bg-sidebar-accent/20">
-        {listBody}
-      </div>
-    );
-  }
-
   return (
-    <Card className="flex max-h-[420px] flex-col">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">Biblioteca</CardTitle>
-      </CardHeader>
-      <CardContent className="flex-1 p-0">{listBody}</CardContent>
-    </Card>
+    <>
+      <AlertDialog
+        open={docToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setDocToDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar documento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se quitará de la biblioteca y se borrarán sus vectores en Pinecone.
+              {docToDelete && (
+                <span className="mt-2 block font-mono text-xs text-foreground">
+                  {docToDelete.fileName}
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={(e) => {
+                e.preventDefault();
+                const target = docToDelete;
+                setDocToDelete(null);
+                if (target) void deleteDoc(target);
+              }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {embedded ? (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-sidebar-border bg-sidebar-accent/20">
+          {listBody}
+        </div>
+      ) : (
+        <Card className="flex max-h-[420px] flex-col">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Biblioteca</CardTitle>
+          </CardHeader>
+          <CardContent className="flex-1 p-0">{listBody}</CardContent>
+        </Card>
+      )}
+    </>
   );
 }

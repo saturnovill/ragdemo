@@ -3,6 +3,7 @@ import { getIndex } from "@/lib/pinecone";
 import { BLOB_PREFIX } from "@/lib/constants";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
@@ -28,9 +29,14 @@ export async function GET() {
     })
   );
 
-  return Response.json({
-    documents: out.filter(Boolean),
-  });
+  return Response.json(
+    { documents: out.filter(Boolean) },
+    {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+      },
+    }
+  );
 }
 
 export async function DELETE(req: Request) {

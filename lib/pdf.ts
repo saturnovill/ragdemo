@@ -17,18 +17,22 @@ export async function extractPdfTextByPage(buffer: Buffer): Promise<string[]> {
     disableFontFace: false,
   });
   const pdf = await loadingTask.promise;
-  const out: string[] = [];
-  for (let p = 1; p <= pdf.numPages; p++) {
-    const page = await pdf.getPage(p);
-    const tc = await page.getTextContent();
-    const text = tc.items
-      .map((item) => ("str" in item && typeof item.str === "string" ? item.str : ""))
-      .join(" ")
-      .replace(/\s+/g, " ")
-      .trim();
-    out.push(text || "(página sin texto extraíble)");
-  }
-  return out;
+  const pageNums = Array.from({ length: pdf.numPages }, (_, i) => i + 1);
+  const texts = await Promise.all(
+    pageNums.map(async (p) => {
+      const page = await pdf.getPage(p);
+      const tc = await page.getTextContent();
+      const text = tc.items
+        .map((item) =>
+          "str" in item && typeof item.str === "string" ? item.str : ""
+        )
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+      return text || "(página sin texto extraíble)";
+    })
+  );
+  return texts;
 }
 
 export async function renderPdfPagesToPng(
@@ -38,6 +42,8 @@ export async function renderPdfPagesToPng(
     viewportScale: 1.25,
     returnPageContent: true,
     disableFontFace: true,
+    processPagesInParallel: true,
+    concurrencyLimit: 4,
   });
   return pages
     .filter((p) => p.content)

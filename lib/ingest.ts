@@ -12,6 +12,7 @@ import { writeManifest } from "@/lib/manifest";
 import type { DocumentManifest } from "@/lib/types";
 import { documentPrefix } from "@/lib/constants";
 import { mediaProxyUrl } from "@/lib/blob-media";
+import { runPool } from "@/lib/pool";
 
 const SNIPPET_MAX = 3500;
 
@@ -116,20 +117,17 @@ export async function ingestDocument(input: {
 
   try {
     if (mimeType === "application/pdf") {
-      const texts = await extractPdfTextByPage(buffer);
-      const pngPages = await renderPdfPagesToPng(buffer);
+      const [texts, pngPages] = await Promise.all([
+        extractPdfTextByPage(buffer),
+        renderPdfPagesToPng(buffer),
+      ]);
       const pngByPage = new Map(
         pngPages.map((p) => [p.pageNumber, p.content])
       );
 
-      const rows: {
-        id: string;
-        values: number[];
-        metadata: Record<string, string | number>;
-      }[] = [];
-
-      for (let pi = 0; pi < texts.length; pi++) {
-        const pageNum = pi + 1;
+      const pageNums = texts.map((_, i) => i + 1);
+      const uploadConcurrency = Math.min(6, Math.max(2, pageNums.length));
+      const uploaded = await runPool(pageNums, uploadConcurrency, async (pageNum) => {
         let pagePng = pngByPage.get(pageNum);
         if (!pagePng) {
           pagePng = await placeholderPng(`Página ${pageNum}`);
@@ -140,32 +138,54 @@ export async function ingestDocument(input: {
           "image/png",
           token
         );
+        return { pageNum, mediaUrl };
+      });
+      const mediaByPage = new Map(uploaded.map((u) => [u.pageNum, u.mediaUrl]));
 
+      type EmbedJob = {
+        pageNum: number;
+        ci: number;
+        snippet: string;
+        mediaUrl: string;
+      };
+      const embedJobs: EmbedJob[] = [];
+      for (let pi = 0; pi < texts.length; pi++) {
+        const pageNum = pi + 1;
+        const mediaUrl = mediaByPage.get(pageNum);
+        if (!mediaUrl) continue;
         const pageText = texts[pi] ?? "";
         const chunks = chunkText(pageText);
         const toEmbed =
           chunks.length > 0
             ? chunks
             : ["(sin texto en esta página; usa la imagen de referencia)"];
-
         for (let ci = 0; ci < toEmbed.length; ci++) {
-          const snippet = toEmbed[ci].slice(0, SNIPPET_MAX);
-          const values = await embedText(snippet, "RETRIEVAL_DOCUMENT");
-          rows.push({
-            id: vectorId(documentId, pageNum, ci),
-            values,
-            metadata: {
-              documentId,
-              fileName,
-              page: pageNum,
-              chunkIndex: ci,
-              snippet,
-              mediaUrl,
-              kind: "pdf",
-            },
+          embedJobs.push({
+            pageNum,
+            ci,
+            snippet: toEmbed[ci].slice(0, SNIPPET_MAX),
+            mediaUrl,
           });
         }
       }
+
+      const embedConcurrency = 8;
+      const rows = await runPool(embedJobs, embedConcurrency, async (job) => {
+        const values = await embedText(job.snippet, "RETRIEVAL_DOCUMENT");
+        return {
+          id: vectorId(documentId, job.pageNum, job.ci),
+          values,
+          metadata: {
+            documentId,
+            fileName,
+            page: job.pageNum,
+            chunkIndex: job.ci,
+            snippet: job.snippet,
+            mediaUrl: job.mediaUrl,
+            kind: "pdf",
+          },
+        };
+      });
 
       manifest.pageCount = texts.length;
       manifest.status = "ready";
@@ -216,28 +236,27 @@ export async function ingestDocument(input: {
       );
       const toEmbed =
         chunks.length > 0 ? chunks : [full.slice(0, SNIPPET_MAX) || "(vacío)"];
-      const rows: {
-        id: string;
-        values: number[];
-        metadata: Record<string, string | number>;
-      }[] = [];
-      for (let ci = 0; ci < toEmbed.length; ci++) {
-        const snippet = toEmbed[ci].slice(0, SNIPPET_MAX);
-        const values = await embedText(snippet, "RETRIEVAL_DOCUMENT");
-        rows.push({
-          id: vectorId(documentId, 1, ci),
-          values,
-          metadata: {
-            documentId,
-            fileName,
-            page: 1,
-            chunkIndex: ci,
-            snippet,
-            mediaUrl,
-            kind: "text",
-          },
-        });
-      }
+      const rows = await runPool(
+        toEmbed.map((_, ci) => ci),
+        8,
+        async (ci) => {
+          const snippet = toEmbed[ci].slice(0, SNIPPET_MAX);
+          const values = await embedText(snippet, "RETRIEVAL_DOCUMENT");
+          return {
+            id: vectorId(documentId, 1, ci),
+            values,
+            metadata: {
+              documentId,
+              fileName,
+              page: 1,
+              chunkIndex: ci,
+              snippet,
+              mediaUrl,
+              kind: "text",
+            },
+          };
+        }
+      );
       await upsertBatch(rows);
       manifest.pageCount = 1;
       manifest.status = "ready";

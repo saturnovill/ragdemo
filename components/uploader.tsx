@@ -22,6 +22,11 @@ export function Uploader({
       const file = files[0];
       if (!file) return;
       setBusy(true);
+      const loadingMsg =
+        file.type === "application/pdf"
+          ? "Indexando PDF (varias páginas pueden tardar un poco)…"
+          : "Subiendo e indexando…";
+      const toastId = toast.loading(loadingMsg);
       try {
         const fd = new FormData();
         fd.set("file", file);
@@ -34,11 +39,14 @@ export function Uploader({
           throw new Error(data.error ?? "Error al subir");
         }
         toast.success("Documento indexado", {
+          id: toastId,
           description: data.fileName ?? file.name,
         });
         onUploaded();
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Error al subir");
+        toast.error(e instanceof Error ? e.message : "Error al subir", {
+          id: toastId,
+        });
       } finally {
         setBusy(false);
       }
