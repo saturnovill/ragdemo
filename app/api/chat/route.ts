@@ -96,6 +96,11 @@ export async function POST(req: Request) {
   return createUIMessageStreamResponse({
     stream: createUIMessageStream({
       execute: async ({ writer }) => {
+        writer.write({
+          type: "data-sources",
+          id: generateId(),
+          data: { items: sources },
+        });
         const result = streamText({
           model: getChatModel(),
           system,
@@ -106,11 +111,6 @@ export async function POST(req: Request) {
           writer.write(part);
         }
         await result.text;
-        writer.write({
-          type: "data-sources",
-          id: generateId(),
-          data: { items: sources },
-        });
       },
     }),
   });
