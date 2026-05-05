@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { DocumentManifest } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { DocumentPreviewOverlay } from "@/components/document-preview-overlay";
 
 export function DocumentList({
   refreshKey,
@@ -30,6 +31,7 @@ export function DocumentList({
   const [docs, setDocs] = useState<DocumentManifest[]>([]);
   const [loading, setLoading] = useState(true);
   const [docToDelete, setDocToDelete] = useState<DocumentManifest | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<DocumentManifest | null>(null);
 
   const load = useCallback(async (opts?: { quiet?: boolean }) => {
     if (!opts?.quiet) setLoading(true);
@@ -103,12 +105,17 @@ export function DocumentList({
               >
                 <FileText className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
-                  <div
-                    className="truncate font-mono text-[11px] font-medium leading-tight text-foreground"
-                    title={d.fileName}
+                  <button
+                    type="button"
+                    title={`Vista previa: ${d.fileName}`}
+                    className={cn(
+                      "w-full truncate text-left font-mono text-[11px] font-medium leading-tight text-foreground",
+                      "rounded-sm outline-none hover:text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                    )}
+                    onClick={() => setPreviewDoc(d)}
                   >
                     {d.fileName}
-                  </div>
+                  </button>
                   <div className="mt-1 flex flex-wrap gap-0.5">
                     <Badge
                       variant={
@@ -157,6 +164,11 @@ export function DocumentList({
 
   return (
     <>
+      <DocumentPreviewOverlay
+        doc={previewDoc}
+        open={previewDoc !== null}
+        onClose={() => setPreviewDoc(null)}
+      />
       <AlertDialog
         open={docToDelete !== null}
         onOpenChange={(open) => {
